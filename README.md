@@ -12,12 +12,12 @@ OW2 // NETHERWATCH
    <img src="assets/app_icon.png" width="90" alt="NetherWatch Icon" style="border-radius: 14px;" />
   </td>
   <td>
-   <b>NetherWatch</b> — أداة محمولة وسريعة لتثبيت اتصالك في لعبة <b>Overwatch</b> على سيرفر هولندا فقط (<code>ams1</code>) وحظر باقي السيرفرات تلقائياً في جدار حماية ويندوز.
+   <b>NetherWatch</b> — أداة سريعة لتثبيت اتصالك في لعبة <b>Overwatch</b> على سيرفر هولندا فقط (<code>ams1</code>) وتبليك باقي السيرفرات تلقائياً
   </td>
   <td align="center">
     <a href="https://github.com/omar-hisham26/NetherWatch/raw/main/NetherWatch.exe">
      <p></p>
-     <pre>⚡ تحميل البرنامج (NetherWatch.exe)</pre>
+     <pre>⚡ تحميل البرنامج </pre>
     </a>
   </td>
   <td align="center">
