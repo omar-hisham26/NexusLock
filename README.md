@@ -14,7 +14,6 @@
 
 ### ⬇️ روابط التحميل المباشرة (Direct Download Links)
 
-[![تحميل النسخة المحمولة المباشرة](https://img.shields.io/badge/⬇️_تحميل_النسخة_المحمولة_المباشرة-NexusLock.exe-10b981?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/omar-hisham26/NexusLock/releases/latest/download/NexusLock.exe)
 &nbsp;&nbsp;
 [![تحميل مثبت الويندوز](https://img.shields.io/badge/📦_تحميل_مثبت_الويندوز_(Setup)-NexusLock--Setup.exe-38bdf8?style=for-the-badge&logo=inno-setup&logoColor=white)](https://github.com/omar-hisham26/NexusLock/releases/latest/download/NexusLock-Setup.exe)
 
