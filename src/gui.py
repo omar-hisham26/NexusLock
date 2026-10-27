@@ -429,6 +429,8 @@ class NetherWatchGUI:
             font=("Consolas", 9),
         )
         self.path_entry.pack(fill="x")
+        self.path_entry.bind("<FocusOut>", self._on_path_entry_changed)
+        self.path_entry.bind("<Return>", self._on_path_entry_changed)
 
         self.btn_browse = ModernButton(
             path_row,
@@ -717,9 +719,11 @@ class NetherWatchGUI:
         if not firewall.is_admin():
             self.add_log("تنبيه: البرنامج يعمل بدون صلاحية مسؤول، قد يفشل تعديل جدار الحماية.", "warn")
 
-        # Try auto-detecting game executable if not configured
+        # Check if saved path exists, or auto-detect
         current_path = self.game_path_var.get().strip()
-        if not current_path or not os.path.exists(current_path):
+        if current_path and os.path.exists(current_path):
+            self.add_log(f"تم تحميل مسار اللعبة المحفوظ بنجاح:\n  {current_path}", "success")
+        else:
             found = firewall.find_game_automatically()
             if found:
                 self.game_path_var.set(found)
@@ -824,18 +828,28 @@ class NetherWatchGUI:
     # -------------------------------------------------------------
     # Manually browse and select Overwatch.exe
     # -------------------------------------------------------------
+    def _on_path_entry_changed(self, _event=None):
+        raw = self.game_path_var.get().strip().strip('"').strip("'")
+        if raw:
+            norm = os.path.normpath(raw)
+            if norm != self.game_path_var.get():
+                self.game_path_var.set(norm)
+            if os.path.exists(norm):
+                self.save_user_options()
+
     def browse_game_path(self):
         chosen = filedialog.askopenfilename(
             title="اختر ملف Overwatch.exe",
             filetypes=[("Overwatch Executable", "Overwatch.exe"), ("All Executables", "*.exe")],
         )
         if chosen:
-            if os.path.basename(chosen).lower() != "overwatch.exe":
+            clean_chosen = os.path.normpath(chosen.strip().strip('"').strip("'"))
+            if os.path.basename(clean_chosen).lower() != "overwatch.exe":
                 messagebox.showwarning("تنبيه", " اختار ملف Overwatch.exe الصحيح.")
                 return
-            self.game_path_var.set(chosen)
+            self.game_path_var.set(clean_chosen)
             self.save_user_options()
-            self.add_log(f"تم حفظ مسار اللعبة: {chosen}", "success")
+            self.add_log(f"تم حفظ مسار اللعبة: {clean_chosen}", "success")
 
     # -------------------------------------------------------------
     # Enable lock (block all other servers)
@@ -845,10 +859,19 @@ class NetherWatchGUI:
             messagebox.showwarning("اللعبه شغاله", "اللعبه شغاله حالياً! لازم تطفيها أولاً بعدين تقدر تسوي اللي تبيه.")
             return
 
-        path = self.game_path_var.get().strip()
-        if not path or not os.path.exists(path):
+        raw_path = self.game_path_var.get().strip().strip('"').strip("'")
+        if not raw_path:
             messagebox.showerror("مسار اللعبة مفقود", "يرجى اختيار ملف Overwatch.exe أولاً عبر زر 'اختيار الملف'.")
             return
+
+        path = os.path.normpath(raw_path)
+        if not os.path.exists(path):
+            messagebox.showerror("مسار اللعبة مفقود", f"لم يتم العثور على ملف اللعبة في المسار:\n{path}\n\nيرجى إعادة اختيار ملف Overwatch.exe عبر زر 'اختيار الملف'.")
+            return
+
+        # Keep UI entry cleanly normalized
+        self.game_path_var.set(path)
+        self.save_user_options()
 
         self.btn_activate.set_disabled(True)
         self.add_log(" بطبق لك قواعد الحظر في جدار حماية ويندوز...", "info")

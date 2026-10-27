@@ -35,7 +35,20 @@ SERVERS_FILE = CURRENT_DIR / "data" / "servers.json"
 if not SERVERS_FILE.exists() and (BUNDLE_DIR / "data" / "servers.json").exists():
     SERVERS_FILE = BUNDLE_DIR / "data" / "servers.json"
 
-SETTINGS_FILE = CURRENT_DIR / "data" / "settings.json"
+
+def get_settings_file():
+    """
+    Get the settings file path.
+    Prefers %APPDATA%/NetherWatch/settings.json so settings persist reliably
+    even when installed in Program Files, with a local fallback.
+    """
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        return Path(appdata) / APP_NAME / "settings.json"
+    return CURRENT_DIR / "data" / "settings.json"
+
+
+SETTINGS_FILE = get_settings_file()
 
 
 # -------------------------------------------------------------
@@ -102,6 +115,11 @@ def run_powershell(command_text):
         # Log error to file if command failed
         if result.returncode != 0:
             error_details = err if err else out
+            if "#< CLIXML" in error_details:
+                # Extract clean error messages from CLIXML
+                err_lines = re.findall(r'<S S="Error">(.*?)</S>', error_details, re.DOTALL)
+                if err_lines:
+                    error_details = "".join(err_lines).replace("_x000D__x000A_", "\n").replace("_x000D_", "\r").replace("_x000A_", "\n").strip()
             try:
                 with open(CURRENT_DIR / "error.log", "a", encoding="utf-8") as f:
                     f.write(f"\n[PowerShell Error {time_now()}]\nCommand: {command_text[:120]}...\nError: {error_details}\n")
@@ -171,8 +189,24 @@ def enable_netherlands_lock(game_path):
     """
     Block all other servers in Windows Firewall for Overwatch.exe so the game only routes to Netherlands
     """
-    if not os.path.exists(game_path):
-        raise FileNotFoundError(f"لم يتم العثور على ملف اللعبة في المسار:\n{game_path}")
+    if not game_path:
+        raise ValueError("مسار اللعبة فارغ، يرجى تحديد مسار Overwatch.exe أولاً.")
+
+    # Clean and normalize path: strip quotes, whitespace, and convert forward slashes to backslashes
+    clean_path = os.path.normpath(str(game_path).strip().strip('"').strip("'"))
+
+    # If the user selected the game folder instead of Overwatch.exe, search inside it
+    if os.path.isdir(clean_path):
+        for candidate in [
+            os.path.join(clean_path, "_retail_", GAME_EXE_NAME),
+            os.path.join(clean_path, GAME_EXE_NAME),
+        ]:
+            if os.path.isfile(candidate):
+                clean_path = candidate
+                break
+
+    if not os.path.isfile(clean_path):
+        raise FileNotFoundError(f"لم يتم العثور على ملف تشغيل اللعبة ({GAME_EXE_NAME}) في المسار:\n{clean_path}")
 
     # Remove any existing rules first
     disable_netherlands_lock()
@@ -183,7 +217,7 @@ def enable_netherlands_lock(game_path):
         raise ValueError("قائمة الآيبيات فارغة، تأكد من وجود ملف data/servers.json")
 
     ips_formatted = ",".join(f"'{ip}'" for ip in blocked_ips)
-    safe_path = game_path.replace("'", "''")
+    safe_path = clean_path.replace("'", "''")
 
     script = f"""
 $ErrorActionPreference = 'Stop'
@@ -215,11 +249,12 @@ Write-Output "DONE"
                 "نظام ويندوز يرفض تعديل جدار الحماية بدون صلاحيات المسؤول!\n\n"
                 "الحل:\n"
                 "1. أغلق البرنامج.\n"
-                "2. اضغط كليك يمين على run.bat واختر:\n"
+                "2. اضغط كليك يمين على NetherWatch.exe واختر:\n"
                 "   'تشغيل كمسؤول' (Run as administrator).\n"
                 "3. وافق على رسالة ويندوز ثم أعد التفعيل."
             )
-        raise RuntimeError(f"فشل إضافة قاعدة الحظر في جدار الحماية:\n{output}")
+        clean_msg = output.replace("ERROR: ", "").strip()
+        raise RuntimeError(f"فشل إضافة قاعدة الحظر في جدار الحماية:\n{clean_msg}")
     return len(blocked_ips)
 
 
@@ -278,11 +313,12 @@ Write-Output "CLEANED"
     run_powershell(clean_script)
     flush_dns()
 
-    if SETTINGS_FILE.exists():
-        try:
-            SETTINGS_FILE.unlink()
-        except Exception:
-            pass
+    for s_file in (get_settings_file(), CURRENT_DIR / "data" / "settings.json"):
+        if s_file.exists():
+            try:
+                s_file.unlink()
+            except Exception:
+                pass
 
     return True
 
@@ -336,14 +372,14 @@ def find_game_automatically():
     ]
     for path in common_paths:
         if os.path.exists(path):
-            return path
+            return os.path.normpath(path)
 
     # If the game is already running, get its executable path directly
     out = run_powershell(
         "$p = Get-Process -Name Overwatch -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Path; if ($p) { $p }"
     )
     if out and os.path.exists(out):
-        return out
+        return os.path.normpath(out.strip())
 
     # Check path registered in Windows Firewall by Blizzard
     out = run_powershell(
@@ -351,7 +387,7 @@ def find_game_automatically():
         "Get-NetFirewallApplicationFilter | Select-Object -First 1 -ExpandProperty Program"
     )
     if out and os.path.exists(out) and Path(out).name.lower() == GAME_EXE_NAME.lower():
-        return out
+        return os.path.normpath(out.strip())
 
     return ""
 
@@ -360,21 +396,49 @@ def find_game_automatically():
 # 6. User settings persistence
 # -------------------------------------------------------------
 def load_saved_settings():
-    """Load saved settings from settings.json"""
-    if SETTINGS_FILE.exists():
+    """Load saved settings from %APPDATA% or local data/settings.json"""
+    primary = get_settings_file()
+    fallback = CURRENT_DIR / "data" / "settings.json"
+
+    file_to_load = None
+    if primary.exists():
+        file_to_load = primary
+    elif fallback.exists():
+        file_to_load = fallback
+
+    if file_to_load:
         try:
-            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+            with open(file_to_load, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if "game_path" in data and data["game_path"]:
+                    data["game_path"] = os.path.normpath(str(data["game_path"]).strip().strip('"').strip("'"))
+                return data
         except Exception:
             pass
     return {"game_path": "", "unblock_on_close": False}
 
 
 def save_settings(data):
-    """Save user settings to settings.json"""
+    """Save user settings to APPDATA and locally if possible"""
     try:
-        SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+        if "game_path" in data and data["game_path"]:
+            data["game_path"] = os.path.normpath(str(data["game_path"]).strip().strip('"').strip("'"))
+
+        # 1. Save to APPDATA (primary, permanent, user-writable)
+        target = get_settings_file()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with open(target, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-    except Exception:
-        pass
+
+        # 2. Also save to local data/ folder if writable (for portable mode)
+        local_target = CURRENT_DIR / "data" / "settings.json"
+        try:
+            local_target.parent.mkdir(parents=True, exist_ok=True)
+            with open(local_target, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
+        return True
+    except Exception as e:
+        print(f"[Warning] Failed to save settings: {e}")
+        return False
