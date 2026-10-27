@@ -205,6 +205,13 @@ def enable_netherlands_lock(game_path):
                 clean_path = candidate
                 break
 
+    # If the user selected the root launcher (e.g. Steam Overwatch.exe), automatically redirect to _retail_\Overwatch.exe
+    if os.path.isfile(clean_path) and not clean_path.lower().endswith(r"\_retail_\overwatch.exe"):
+        parent_dir = os.path.dirname(clean_path)
+        retail_candidate = os.path.join(parent_dir, "_retail_", GAME_EXE_NAME)
+        if os.path.isfile(retail_candidate):
+            clean_path = retail_candidate
+
     if not os.path.isfile(clean_path):
         raise FileNotFoundError(f"لم يتم العثور على ملف تشغيل اللعبة ({GAME_EXE_NAME}) في المسار:\n{clean_path}")
 
@@ -357,22 +364,31 @@ def is_overwatch_running():
 
 
 def find_game_automatically():
-    """Search for Overwatch.exe in common installation paths (Battle.net and Steam)"""
-    common_paths = [
-        r"C:\Program Files (x86)\Overwatch\_retail_\Overwatch.exe",
-        r"C:\Program Files\Overwatch\_retail_\Overwatch.exe",
-        r"C:\Program Files (x86)\Steam\steamapps\common\Overwatch\_retail_\Overwatch.exe",
-        r"C:\Program Files\Steam\steamapps\common\Overwatch\_retail_\Overwatch.exe",
-        r"D:\Overwatch\_retail_\Overwatch.exe",
-        r"D:\Games\Overwatch\_retail_\Overwatch.exe",
-        r"D:\SteamLibrary\steamapps\common\Overwatch\_retail_\Overwatch.exe",
-        r"E:\Overwatch\_retail_\Overwatch.exe",
-        r"E:\Games\Overwatch\_retail_\Overwatch.exe",
-        r"E:\SteamLibrary\steamapps\common\Overwatch\_retail_\Overwatch.exe",
+    """Search for Overwatch.exe in common installation paths (Battle.net and Steam across all drives)"""
+    candidate_subpaths = [
+        r"Program Files (x86)\Overwatch\_retail_\Overwatch.exe",
+        r"Program Files\Overwatch\_retail_\Overwatch.exe",
+        r"Program Files (x86)\Steam\steamapps\common\Overwatch\_retail_\Overwatch.exe",
+        r"Program Files\Steam\steamapps\common\Overwatch\_retail_\Overwatch.exe",
+        r"SteamLibrary\steamapps\common\Overwatch\_retail_\Overwatch.exe",
+        r"Steam\steamapps\common\Overwatch\_retail_\Overwatch.exe",
+        r"Overwatch\_retail_\Overwatch.exe",
+        r"Games\Overwatch\_retail_\Overwatch.exe",
+        r"Games\SteamLibrary\steamapps\common\Overwatch\_retail_\Overwatch.exe",
+        # Fallback to root launcher (which will be redirected to _retail_)
+        r"SteamLibrary\steamapps\common\Overwatch\Overwatch.exe",
+        r"Steam\steamapps\common\Overwatch\Overwatch.exe",
     ]
-    for path in common_paths:
-        if os.path.exists(path):
-            return os.path.normpath(path)
+    drives = ["C", "D", "E", "F", "G", "H"]
+    for d in drives:
+        for sub in candidate_subpaths:
+            full = f"{d}:\\{sub}"
+            if os.path.exists(full):
+                if not full.lower().endswith(r"\_retail_\overwatch.exe"):
+                    retail = os.path.join(os.path.dirname(full), "_retail_", GAME_EXE_NAME)
+                    if os.path.isfile(retail):
+                        return os.path.normpath(retail)
+                return os.path.normpath(full)
 
     # If the game is already running, get its executable path directly
     out = run_powershell(
