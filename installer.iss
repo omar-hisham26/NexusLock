@@ -1,11 +1,11 @@
-; Script generated for NetherWatch
+; Script generated for NexusLock
 ; Inno Setup Script - Creates a professional Windows Setup Wizard with Next/Browse/Install/Uninstall
 
-#define MyAppName "NetherWatch"
-#define MyAppVersion "1.1.0"
+#define MyAppName "NexusLock"
+#define MyAppVersion "1.0.0"
 #define MyAppPublisher "omar-hisham26"
-#define MyAppURL "https://github.com/omar-hisham26/NetherWatch"
-#define MyAppExeName "NetherWatch.exe"
+#define MyAppURL "https://github.com/omar-hisham26/NexusLock"
+#define MyAppExeName "NexusLock.exe"
 
 [Setup]
 AppId={{C6B4E5F7-4E7B-49C2-B835-64DF8B46C9E1}
@@ -34,7 +34,7 @@ SolidCompression=yes
 
 ; Output file settings
 OutputDir=.
-OutputBaseFilename=NetherWatch-Setup
+OutputBaseFilename=NexusLock-Setup
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -44,9 +44,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "data\servers.json"; DestDir: "{app}\data"; Flags: ignoreversion
-Source: "assets\icon.ico"; DestDir: "{app}\assets"; Flags: ignoreversion
-Source: "assets\app_icon.png"; DestDir: "{app}\assets"; Flags: ignoreversion
+Source: "data\*"; DestDir: "{app}\data"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "assets\*"; DestDir: "{app}\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]

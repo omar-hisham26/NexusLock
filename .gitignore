@@ -1,16 +1,25 @@
 # ========================================================
-# .gitignore for NetherWatch (Python + Windows + PyInstaller)
+# .gitignore for NexusLock (Python + Windows + PyInstaller)
 # ========================================================
+
+# Compiled binaries, executables, and Setup wizard installers
+*.exe
+*.msi
+*.dll
+*.so
+*.dylib
+Output/
+
+# PyInstaller build artifacts & cache
+build/
+dist/
+*.spec
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
 *.pyc
-
-# PyInstaller build artifacts & cache
-build/
-*.spec
 
 # User local data & settings (personal machine paths)
 data/settings.json
