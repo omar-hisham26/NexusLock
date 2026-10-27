@@ -9,7 +9,7 @@
    برنامج خفيف يخليك تلعب <b>Overwatch</b> على <b>سيرفر هولندا (ams1)</b> بس، ويبلك باقي السيرفرات بجدار حماية الويندوز بدون لا يلمس ملفات اللعبة.
   </td>
   <td align="center">
-    <a href="https://github.com/omar-hisham26/NetherWatch/raw/main/NetherWatch-Setup.exe">
+    <a href="https://github.com/omar-hisham26/NetherWatch/releases/latest/download/NetherWatch-Setup.exe">
      <p></p>
      <pre>⚡ تحميل السيت اب (NetherWatch-Setup.exe)</pre>
     </a>
