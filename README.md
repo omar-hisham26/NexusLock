@@ -15,9 +15,15 @@ OW2 // NETHERWATCH
    <b>NetherWatch</b> — أداة محمولة وسريعة لتثبيت اتصالك في لعبة <b>Overwatch</b> على سيرفر هولندا فقط (<code>ams1</code>) وحظر باقي السيرفرات تلقائياً في جدار حماية ويندوز.
   </td>
   <td align="center">
-    <a href="NetherWatch.exe">
+    <a href="https://github.com/omar-hisham26/NetherWatch/raw/main/NetherWatch.exe">
      <p></p>
      <pre>⚡ تحميل البرنامج (NetherWatch.exe)</pre>
+    </a>
+  </td>
+  <td align="center">
+    <a href="https://github.com/omar-hisham26/NetherWatch/releases" target="_blank">
+     <p></p>
+     <pre>🏷️ الإصدارات (Releases)</pre>
     </a>
   </td>
  </tr>
@@ -30,7 +36,7 @@ OW2 // NETHERWATCH
 -->
 
 ## طريقة الاستخدام (How to Use)
-1. حمّل ملف البرنامج مباشرة من الزر أعلاه **[⚡ تحميل البرنامج (NetherWatch.exe)](NetherWatch.exe)**.
+1. حمّل ملف البرنامج مباشرة من الزر أعلاه **[⚡ تحميل البرنامج (NetherWatch.exe)](https://github.com/omar-hisham26/NetherWatch/raw/main/NetherWatch.exe)**.
 2. تأكد من **إغلاق اللعبة** أولاً (`Overwatch.exe`).
 3. شغّل `NetherWatch.exe` كمسؤول (سيطلب الإذن تلقائياً لتعديل جدار الحماية).
 4. اضغط على زر **🛡️ تبليك السيرفرات (سيرفر هولندا بيكون شغال)**.
