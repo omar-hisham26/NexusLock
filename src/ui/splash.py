@@ -1,19 +1,18 @@
 """
-splash.py - Discord-style frameless startup splash screen with automatic updater
+splash.py - Modern CustomTkinter frameless startup splash screen with automatic updater
 """
 import threading
 import time
-import tkinter as tk
 from typing import Callable, Optional
-from src import config
+import customtkinter as ctk
+from src import config, i18n
 from src.core import updater
 from src.ui import theme
-from src.ui.components import draw_rounded_rect
 
 
-class DiscordSplash(tk.Tk):
+class DiscordSplash(ctk.CTk):
     """
-    Frameless, centered Discord-like startup splash window.
+    Frameless, centered Discord-like startup splash window built with CustomTkinter.
     Checks for updates on GitHub, downloads if needed, or boots the main app.
     """
 
@@ -22,150 +21,108 @@ class DiscordSplash(tk.Tk):
         self.on_ready = on_ready_callback
         theme.enable_high_dpi()
 
-        # Frameless window (no standard Windows border or titlebar)
+        # Load language preference early
+        saved_settings = config.load_settings()
+        i18n.set_lang(saved_settings.get("language", "ar"))
+
+        # Frameless window
         self.overrideredirect(True)
-        self.configure(bg=theme.BG_APP)
+        self.configure(fg_color=theme.BG_APP)
+        theme.apply_dark_titlebar(self, round_corners=True)
 
         # Center on screen
-        width = 380
-        height = 250
+        width = 400
+        height = 270
         screen_w = self.winfo_screenwidth()
         screen_h = self.winfo_screenheight()
         pos_x = (screen_w - width) // 2
         pos_y = (screen_h - height) // 2
         self.geometry(f"{width}x{height}+{pos_x}+{pos_y}")
 
-        self.anim_pos = 0
-        self.anim_dir = 1
         self.is_downloading = False
-        self.progress_percent = 0
         self.is_closing = False
+        self.icon_img: Optional[ctk.CTkImage] = None
 
         self._build_ui()
-        self._load_icon()
-
-        # Start animation loop
-        self.after(30, self._pulse_animation)
 
         # Start update check thread
         threading.Thread(target=self._run_update_check, daemon=True).start()
 
     def _build_ui(self):
-        # 1px border container
-        outer = tk.Frame(self, bg=theme.BORDER_COLOR, padx=1, pady=1)
-        outer.pack(fill="both", expand=True)
+        card = ctk.CTkFrame(
+            self,
+            fg_color=theme.BG_CARD,
+            border_color=theme.BORDER_COLOR,
+            border_width=1,
+            corner_radius=16,
+        )
+        card.pack(fill="both", expand=True, padx=4, pady=4)
 
-        inner = tk.Frame(outer, bg=theme.BG_APP, padx=20, pady=24)
-        inner.pack(fill="both", expand=True)
+        inner = ctk.CTkFrame(card, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=24, pady=24)
 
-        # App Icon
-        self.icon_lbl = tk.Label(inner, bg=theme.BG_APP)
-        self.icon_lbl.pack(pady=(4, 8))
+        # High-DPI App Icon (LANCZOS 64x64)
+        icon_path = config.ASSETS_DIR / "app_icon.png"
+        self.icon_img = theme.load_ctk_image(icon_path, (64, 64))
+        if self.icon_img:
+            ctk.CTkLabel(
+                inner,
+                text="",
+                image=self.icon_img,
+                width=64,
+                height=64,
+            ).pack(pady=(4, 10))
 
         # Title
-        tk.Label(
+        ctk.CTkLabel(
             inner,
-            text="⚡ NEXUSLOCK",
-            fg=theme.TEXT_WHITE,
-            bg=theme.BG_APP,
-            font=(theme.FONT_FAMILY, 15, "bold"),
+            text=i18n.t("app_brand_title"),
+            text_color=theme.TEXT_WHITE,
+            font=(theme.FONT_FAMILY, 20, "bold"),
         ).pack()
 
-        # Version
-        tk.Label(
+        # Version Badge
+        ctk.CTkLabel(
             inner,
-            text=f"Version {config.VERSION}",
-            fg=theme.TEXT_MUTED,
-            bg=theme.BG_APP,
-            font=(theme.FONT_FAMILY, 8),
-        ).pack(pady=(1, 16))
+            text=i18n.t("version_badge", ver=config.VERSION),
+            text_color=theme.CYBER_BLUE,
+            font=(theme.FONT_FAMILY, 11, "bold"),
+        ).pack(pady=(2, 18))
 
-        # Progress Canvas
-        self.progress_canvas = tk.Canvas(
+        # Smooth Rounded Progress Bar
+        self.progress_bar = ctk.CTkProgressBar(
             inner,
-            width=280,
-            height=6,
-            bg="#131824",
-            highlightthickness=0,
-            bd=0,
+            width=290,
+            height=8,
+            corner_radius=4,
+            fg_color=theme.BG_INPUT,
+            progress_color=theme.CYBER_BLUE,
+            mode="indeterminate",
+            indeterminate_speed=1.4,
         )
-        self.progress_canvas.pack(pady=(0, 10))
+        self.progress_bar.pack(pady=(0, 12))
+        self.progress_bar.start()
 
         # Status Label
-        self.status_lbl = tk.Label(
+        self.status_lbl = ctk.CTkLabel(
             inner,
-            text="Checking for updates...",
-            fg=theme.TEXT_MUTED,
-            bg=theme.BG_APP,
-            font=(theme.FONT_FAMILY, 9),
+            text=i18n.t("splash_checking"),
+            text_color=theme.TEXT_MUTED,
+            font=(theme.FONT_FAMILY, 12),
         )
         self.status_lbl.pack()
 
-    def _load_icon(self):
-        icon_path = config.ASSETS_DIR / "app_icon.png"
-        if icon_path.exists():
+    def _set_status(self, text: str, fg_color: str = theme.TEXT_MUTED):
+        if not self.is_closing:
             try:
-                full = tk.PhotoImage(file=str(icon_path))
-                # Scale down to ~56px
-                factor = max(1, full.width() // 56)
-                scaled = full.subsample(factor, factor)
-                self.icon_img = scaled
-                self.icon_lbl.configure(image=self.icon_img)
+                self.status_lbl.configure(text=text, text_color=fg_color)
             except Exception:
                 pass
 
-    def _pulse_animation(self):
-        if self.is_closing:
-            return
-
-        self.progress_canvas.delete("all")
-        w = 280
-        h = 6
-
-        if not self.is_downloading:
-            # Discord style back-and-forth glowing glide
-            bar_w = 70
-            draw_rounded_rect(self.progress_canvas, 0, 0, w, h, 3, fill="#131824", outline="")
-            draw_rounded_rect(
-                self.progress_canvas,
-                self.anim_pos,
-                0,
-                self.anim_pos + bar_w,
-                h,
-                3,
-                fill=theme.CYBER_BLUE,
-                outline="",
-            )
-            self.anim_pos += self.anim_dir * 5
-            if self.anim_pos >= w - bar_w:
-                self.anim_dir = -1
-            elif self.anim_pos <= 0:
-                self.anim_dir = 1
-        else:
-            # Download percentage fill
-            draw_rounded_rect(self.progress_canvas, 0, 0, w, h, 3, fill="#131824", outline="")
-            fill_w = max(4, int((self.progress_percent / 100.0) * w))
-            draw_rounded_rect(
-                self.progress_canvas,
-                0,
-                0,
-                fill_w,
-                h,
-                3,
-                fill=theme.GREEN,
-                outline="",
-            )
-
-        self.after(30, self._pulse_animation)
-
-    def _set_status(self, text: str, fg_color: str = theme.TEXT_MUTED):
-        if not self.is_closing:
-            self.status_lbl.configure(text=text, fg=fg_color)
-
     def _run_update_check(self):
         """Background thread checking for GitHub releases."""
-        time.sleep(0.4)  # Small natural pause for splash display
-        self.after(0, lambda: self._set_status("جاري البحث عن تحديثات...", theme.CYBER_BLUE))
+        time.sleep(0.4)
+        self.after(0, lambda: self._set_status(i18n.t("splash_checking"), theme.CYBER_BLUE))
 
         update_info = updater.check_for_update(timeout=4)
 
@@ -175,24 +132,38 @@ class DiscordSplash(tk.Tk):
 
             if download_url:
                 self.is_downloading = True
-                self.after(0, lambda: self._set_status(f"تم العثور على تحديث {ver}! جاري التنزيل...", theme.AMBER))
+
+                def switch_to_determinate():
+                    if not self.is_closing:
+                        self.progress_bar.stop()
+                        self.progress_bar.configure(mode="determinate", progress_color=theme.GREEN)
+                        self.progress_bar.set(0)
+                        self._set_status(i18n.t("splash_found", ver=ver), theme.AMBER)
+
+                self.after(0, switch_to_determinate)
 
                 def on_progress(p: int):
-                    self.progress_percent = p
-                    self.after(0, lambda: self._set_status(f"جاري تنزيل التحديث ({p}%)...", theme.GREEN))
+                    def _upd():
+                        if not self.is_closing:
+                            self.progress_bar.set(max(0.02, p / 100.0))
+                            self._set_status(i18n.t("splash_downloading", p=p), theme.GREEN)
+                    self.after(0, _upd)
 
-                # Download and restart
                 ok = updater.download_and_install_update(download_url, progress_callback=on_progress)
                 if ok:
                     return
 
         # Up to date or check completed
-        self.after(0, lambda: self._set_status("البرنامج محدث! جاري التشغيل...", theme.GREEN))
-        time.sleep(0.6)
+        self.after(0, lambda: self._set_status(i18n.t("splash_ready"), theme.GREEN))
+        time.sleep(0.5)
         self.after(0, self._launch_main_app)
 
     def _launch_main_app(self):
         self.is_closing = True
-        self.destroy()
+        try:
+            self.progress_bar.stop()
+            self.destroy()
+        except Exception:
+            pass
         if self.on_ready:
             self.on_ready()

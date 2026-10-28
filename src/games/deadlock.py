@@ -7,52 +7,92 @@ import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-from src import config
+from src import config, i18n
 from src.core import firewall
 from src.games.base import BaseGame
 
 DEADLOCK_SERVER_LABELS = {
-    "ams": "🇳🇱 نيذرلاند (Netherlands) — أمستردام (ams)",
-    "fra": "🇩🇪 ألمانيا (Germany) — فرانكفورت (fra)",
-    "dxb": "🇦🇪 الشرق الأوسط (Middle East) — دبي (dxb)",
-    "dfjr": "🇦🇪 الإمارات — الفجيرة (dfjr)",
-    "dfra": "🇩🇪 ألمانيا — فرانكفورت 2 (dfra)",
-    "lhr": "🇬🇧 بريطانيا (UK) — لندن (lhr)",
-    "dlhr": "🇬🇧 بريطانيا — لندن 2 (dlhr)",
-    "par": "🇫🇷 فرنسا (France) — باريس (par)",
-    "mad": "🇪🇸 إسبانيا (Spain) — مدريد (mad)",
-    "vie": "🇦🇹 النمسا (Austria) — فيينا (vie)",
-    "dvie": "🇦🇹 النمسا — فيينا 2 (dvie)",
-    "sto": "🇸🇪 السويد (Sweden) — ستوكهولم (sto)",
-    "sto2": "🇸🇪 السويد — ستوكهولم 2 (sto2)",
-    "waw": "🇵🇱 بولندا (Poland) — وارسو (waw)",
-    "hel": "🇫🇮 فنلندا (Finland) — هلسنكي (hel)",
-    "iad": "🇺🇸 أمريكا الشرقية (US East) — (iad)",
-    "ord": "🇺🇸 أمريكا الوسطى (US Central) — (ord)",
-    "atl": "🇺🇸 أمريكا — أتلانتا (atl)",
-    "dfw": "🇺🇸 أمريكا — دالاس (dfw)",
-    "lax": "🇺🇸 أمريكا الغربية (US West) — (lax)",
-    "sea": "🇺🇸 أمريكا — سياتل (sea)",
-    "sgp": "🇸🇬 سنغافورة (Singapore) — (sgp)",
-    "hkg": "🇭🇰 هونغ كونغ (Hong Kong) — (hkg)",
-    "tyo": "🇯🇵 اليابان (Japan) — طوكيو (tyo)",
-    "seo": "🇰🇷 كوريا (Korea) — سيول (seo)",
-    "bom2": "🇮🇳 الهند — مومباي (bom2)",
-    "maa2": "🇮🇳 الهند — تشيناي (maa2)",
-    "jnb": "🇿🇦 جنوب أفريقيا (South Africa) — (jnb)",
-    "gru": "🇧🇷 البرازيل (Brazil) — (gru)",
-    "eze": "🇦🇷 الأرجنتين (Argentina) — (eze)",
-    "scl": "🇨🇱 تشيلي (Chile) — (scl)",
-    "lim": "🇵🇪 بيرو (Peru) — (lim)",
-    "syd": "🇦🇺 أستراليا (Australia) — سيدني (syd)",
-    "gum": "🇬🇺 غوام (gum)",
+    "ar": {
+        "ams": "🇳🇱 هولندا — أمستردام",
+        "fra": "🇩🇪 ألمانيا — فرانكفورت 1",
+        "dxb": "🇦🇪 الشرق الأوسط — دبي",
+        "dfjr": "🇦🇪 الإمارات — الفجيرة",
+        "dfra": "🇩🇪 ألمانيا — فرانكفورت 2",
+        "lhr": "🇬🇧 بريطانيا — لندن 1",
+        "dlhr": "🇬🇧 بريطانيا — لندن 2",
+        "par": "🇫🇷 فرنسا — باريس",
+        "mad": "🇪🇸 إسبانيا — مدريد",
+        "vie": "🇦🇹 النمسا — فيينا 1",
+        "dvie": "🇦🇹 النمسا — فيينا 2",
+        "sto": "🇸🇪 السويد — ستوكهولم 1",
+        "sto2": "🇸🇪 السويد — ستوكهولم 2",
+        "waw": "🇵🇱 بولندا — وارسو",
+        "hel": "🇫🇮 فنلندا — هلسنكي",
+        "iad": "🇺🇸 أمريكا الشرقية — فرجينيا",
+        "ord": "🇺🇸 أمريكا الوسطى — شيكاغو",
+        "atl": "🇺🇸 أمريكا الجنوبية — أتلانتا",
+        "dfw": "🇺🇸 أمريكا الوسطى — دالاس",
+        "lax": "🇺🇸 أمريكا الغربية — لوس أنجلوس",
+        "sea": "🇺🇸 أمريكا الشمالية — سياتل",
+        "sgp": "🇸🇬 سنغافورة",
+        "hkg": "🇭🇰 هونغ كونغ",
+        "tyo": "🇯🇵 اليابان — طوكيو",
+        "seo": "🇰🇷 كوريا الجنوبية — سيول",
+        "bom2": "🇮🇳 الهند — مومباي",
+        "maa2": "🇮🇳 الهند — تشيناي",
+        "jnb": "🇿🇦 جنوب أفريقيا — جوهانسبرغ",
+        "gru": "🇧🇷 البرازيل — ساو باولو",
+        "eze": "🇦🇷 الأرجنتين — بوينس آيرس",
+        "scl": "🇨🇱 تشيلي — سانتياغو",
+        "lim": "🇵🇪 بيرو — ليما",
+        "syd": "🇦🇺 أستراليا — سيدني",
+        "gum": "🇬🇺 غوام",
+    },
+    "en": {
+        "ams": "🇳🇱 Netherlands — Amsterdam (ams)",
+        "fra": "🇩🇪 Germany — Frankfurt (fra)",
+        "dxb": "🇦🇪 Middle East — Dubai (dxb)",
+        "dfjr": "🇦🇪 UAE — Fujairah (dfjr)",
+        "dfra": "🇩🇪 Germany — Frankfurt 2 (dfra)",
+        "lhr": "🇬🇧 United Kingdom — London (lhr)",
+        "dlhr": "🇬🇧 United Kingdom — London 2 (dlhr)",
+        "par": "🇫🇷 France — Paris (par)",
+        "mad": "🇪🇸 Spain — Madrid (mad)",
+        "vie": "🇦🇹 Austria — Vienna (vie)",
+        "dvie": "🇦🇹 Austria — Vienna 2 (dvie)",
+        "sto": "🇸🇪 Sweden — Stockholm (sto)",
+        "sto2": "🇸🇪 Sweden — Stockholm 2 (sto2)",
+        "waw": "🇵🇱 Poland — Warsaw (waw)",
+        "hel": "🇫🇮 Finland — Helsinki (hel)",
+        "iad": "🇺🇸 US East — Virginia (iad)",
+        "ord": "🇺🇸 US Central — Chicago (ord)",
+        "atl": "🇺🇸 US South — Atlanta (atl)",
+        "dfw": "🇺🇸 US Central — Dallas (dfw)",
+        "lax": "🇺🇸 US West — Los Angeles (lax)",
+        "sea": "🇺🇸 US Northwest — Seattle (sea)",
+        "sgp": "🇸🇬 Singapore — (sgp)",
+        "hkg": "🇭🇰 Hong Kong — (hkg)",
+        "tyo": "🇯🇵 Japan — Tokyo (tyo)",
+        "seo": "🇰🇷 South Korea — Seoul (seo)",
+        "bom2": "🇮🇳 India — Mumbai (bom2)",
+        "maa2": "🇮🇳 India — Chennai (maa2)",
+        "jnb": "🇿🇦 South Africa — Johannesburg (jnb)",
+        "gru": "🇧🇷 Brazil — Sao Paulo (gru)",
+        "eze": "🇦🇷 Argentina — Buenos Aires (eze)",
+        "scl": "🇨🇱 Chile — Santiago (scl)",
+        "lim": "🇵🇪 Peru — Lima (lim)",
+        "syd": "🇦🇺 Australia — Sydney (syd)",
+        "gum": "🇬🇺 Guam — (gum)",
+    },
 }
 
 
 class DeadlockGame(BaseGame):
     game_id = "deadlock"
     display_name = "Deadlock"
+    display_name_ar = "ديدلوك"
     tagline = "Valve Corporation (Steam SDR Network)"
+    tagline_ar = "شركة فالف — شبكة ستيم"
     icon_filename = "deadlock.png"
     rule_name = "NexusLock - Deadlock (Server Lock)"
     group_name = "NexusLock_Deadlock"
@@ -83,6 +123,8 @@ class DeadlockGame(BaseGame):
 
     def get_servers_list(self) -> List[Dict[str, Any]]:
         raw = self.get_raw_servers_dict()
+        lang = i18n.get_lang()
+        labels = DEADLOCK_SERVER_LABELS.get(lang, DEADLOCK_SERVER_LABELS["ar"])
         results = []
         # Put Netherlands (ams) first, then Germany (fra) and Dubai (dxb)
         priority_order = ["ams", "fra", "dxb", "lhr", "par", "mad", "vie", "sto"]
@@ -93,14 +135,14 @@ class DeadlockGame(BaseGame):
                 info = raw[code]
                 results.append({
                     "code": code,
-                    "title": DEADLOCK_SERVER_LABELS.get(code, info.get("title", code.upper())),
+                    "title": labels.get(code, info.get("title", code.upper())),
                     "ping_ip": info.get("ping_ip", ""),
                 })
                 added.add(code)
 
         for code, info in sorted(raw.items()):
             if code not in added:
-                title = DEADLOCK_SERVER_LABELS.get(code, info.get("title", code.upper()))
+                title = labels.get(code, info.get("title", code.upper()))
                 results.append({
                     "code": code,
                     "title": title,
@@ -177,10 +219,19 @@ class DeadlockGame(BaseGame):
                 if os.path.isfile(full):
                     return self.resolve_executable_path(full)
 
-        out = firewall.run_powershell(
-            "$p = Get-Process -Name project8, deadlock -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Path; if ($p) { $p }"
-        )
-        if out and os.path.isfile(out.strip()):
-            return self.resolve_executable_path(out.strip())
+        if os.name == "nt":
+            try:
+                import winreg
+                with winreg.OpenKey(
+                    winreg.HKEY_LOCAL_MACHINE,
+                    r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 1422450",
+                ) as key:
+                    install_loc, _ = winreg.QueryValueEx(key, "InstallLocation")
+                    if install_loc:
+                        resolved = self.resolve_executable_path(install_loc)
+                        if resolved:
+                            return resolved
+            except Exception:
+                pass
 
         return ""

@@ -6,7 +6,7 @@ echo ========================================================
 echo.
 
 echo [1/3] Compiling Python source code with PyInstaller...
-python -m PyInstaller --noconsole --onefile --name "NexusLock" --icon="assets/icon.ico" --add-data "data;data" --add-data "assets;assets" main.py
+python -m PyInstaller --noconsole --onefile --clean --uac-admin --version-file="version_info.txt" --name "NexusLock" --icon="assets/icon.ico" --collect-all customtkinter --add-data "data;data" --add-data "assets;assets" main.py
 
 if exist "dist\NexusLock.exe" (
     echo [2/3] Moving NexusLock.exe to main directory...

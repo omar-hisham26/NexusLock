@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 import os
 import subprocess
 from typing import List, Dict, Any, Optional
+from src import i18n
 from src.core import firewall, admin
 
 
@@ -13,12 +14,22 @@ class BaseGame(ABC):
 
     game_id: str = "base"
     display_name: str = "Base Game"
+    display_name_ar: str = "لعبة"
     tagline: str = "Game Profile"
+    tagline_ar: str = "ملف اللعبة"
     icon_filename: str = "icon.ico"
     rule_name: str = "NexusLock - Base"
     group_name: str = "NexusLock_Base"
     exe_names: List[str] = []
     default_server_code: str = "ams"
+
+    def get_display_name(self) -> str:
+        """Return localized game name (pure Arabic when 'ar' is selected, English when 'en')."""
+        return self.display_name_ar if i18n.is_rtl() else self.display_name
+
+    def get_tagline(self) -> str:
+        """Return localized platform tagline."""
+        return self.tagline_ar if i18n.is_rtl() else self.tagline
 
     def is_running(self) -> bool:
         """Check if any of the game's executable processes are running."""
@@ -70,16 +81,16 @@ class BaseGame(ABC):
     def enable_lock(self, game_path: str, target_server_code: Optional[str] = None) -> int:
         """Enable firewall block rule for this game, preserving only the target server."""
         if not game_path:
-            raise ValueError(f"مسار اللعبة فارغ! يرجى تحديد مسار ملف {self.display_name} أولاً.")
+            raise ValueError(i18n.t("err_empty_path", game=self.display_name))
 
         resolved = self.resolve_executable_path(game_path)
         if not resolved or not os.path.isfile(resolved):
-            raise FileNotFoundError(f"لم يتم العثور على ملف تشغيل اللعبة في المسار:\n{game_path}")
+            raise FileNotFoundError(i18n.t("err_file_not_found", path=game_path))
 
         target_code = target_server_code or self.default_server_code
         blocked_ips = self.get_blocked_ips(target_code)
         if not blocked_ips:
-            raise ValueError("قائمة العناوين المراد حظرها فارغة!")
+            raise ValueError(i18n.t("err_empty_ips"))
 
         # Remove previous rule then create new one
         self.disable_lock()

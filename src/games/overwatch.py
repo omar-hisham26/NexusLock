@@ -7,29 +7,46 @@ import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-from src import config
+from src import config, i18n
 from src.core import firewall
 from src.games.base import BaseGame
 
 OVERWATCH_SERVER_LABELS = {
-    "ams1": "🇳🇱 نيذرلاند (Netherlands) — أمستردام (ams1)",
-    "gmec2": "🇸🇦 الشرق الأوسط — السعودية (gmec2)",
-    "gen1": "🇫🇮 فنلندا (Finland) — هلسنكي (gen1)",
-    "gue4": "🇺🇸 أمريكا الشرقية (US East) — فرجينيا (gue4)",
-    "ord1": "🇺🇸 أمريكا الوسطى (US Central) — شيكاغو (ord1)",
-    "las1": "🇺🇸 أمريكا الغربية (US West) — لاس فيغاس (las1)",
-    "gsg1": "🇸🇬 سنغافورة (Singapore) — (gsg1)",
-    "gtk1": "🇯🇵 اليابان (Japan) — طوكيو (gtk1)",
-    "tpe1": "🇹🇼 تايوان (Taiwan) — (tpe1)",
-    "syd2": "🇦🇺 أستراليا (Australia) — سيدني (syd2)",
-    "gbr1": "🇧🇷 البرازيل (Brazil) — (gbr1)",
+    "ar": {
+        "ams1": "🇳🇱 هولندا — أمستردام 1",
+        "gmec2": "🇸🇦 الشرق الأوسط — السعودية 2",
+        "gen1": "🇫🇮 فنلندا — هلسنكي 1",
+        "gue4": "🇺🇸 أمريكا الشرقية — فرجينيا 4",
+        "ord1": "🇺🇸 أمريكا الوسطى — شيكاغو 1",
+        "las1": "🇺🇸 أمريكا الغربية — لاس فيغاس 1",
+        "gsg1": "🇸🇬 سنغافورة 1",
+        "gtk1": "🇯🇵 اليابان — طوكيو 1",
+        "tpe1": "🇹🇼 تايوان 1",
+        "syd2": "🇦🇺 أستراليا — سيدني 2",
+        "gbr1": "🇧🇷 البرازيل — ساو باولو 1",
+    },
+    "en": {
+        "ams1": "🇳🇱 Netherlands — Amsterdam (ams1)",
+        "gmec2": "🇸🇦 Middle East — Saudi Arabia (gmec2)",
+        "gen1": "🇫🇮 Finland — Helsinki (gen1)",
+        "gue4": "🇺🇸 US East — Virginia (gue4)",
+        "ord1": "🇺🇸 US Central — Chicago (ord1)",
+        "las1": "🇺🇸 US West — Las Vegas (las1)",
+        "gsg1": "🇸🇬 Singapore — (gsg1)",
+        "gtk1": "🇯🇵 Japan — Tokyo (gtk1)",
+        "tpe1": "🇹🇼 Taiwan — (tpe1)",
+        "syd2": "🇦🇺 Australia — Sydney (syd2)",
+        "gbr1": "🇧🇷 Brazil — Sao Paulo (gbr1)",
+    },
 }
 
 
 class OverwatchGame(BaseGame):
     game_id = "overwatch"
     display_name = "Overwatch 2"
+    display_name_ar = "أوفرواتش 2"
     tagline = "Blizzard Entertainment (Battle.net / Steam)"
+    tagline_ar = "شركة بليزارد — باتل نت وستيم"
     icon_filename = "overwatch.png"
     rule_name = "NexusLock - Overwatch 2 (Server Lock)"
     group_name = "NexusLock_OW2"
@@ -61,10 +78,12 @@ class OverwatchGame(BaseGame):
 
     def get_servers_list(self) -> List[Dict[str, Any]]:
         raw = self.get_raw_servers()
+        lang = i18n.get_lang()
+        labels = OVERWATCH_SERVER_LABELS.get(lang, OVERWATCH_SERVER_LABELS["ar"])
         results = []
         for srv in raw:
             token = srv.get("token", "")
-            title = OVERWATCH_SERVER_LABELS.get(token, srv.get("title", token).title())
+            title = labels.get(token, srv.get("title", token).title())
             results.append({
                 "code": token,
                 "title": title,
@@ -145,45 +164,39 @@ class OverwatchGame(BaseGame):
                 if os.path.isfile(full):
                     return os.path.normpath(full)
 
-        out = firewall.run_powershell(
-            "$p = Get-Process -Name Overwatch -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Path; if ($p) { $p }"
-        )
-        if out and os.path.isfile(out.strip()):
-            return self.resolve_executable_path(out.strip())
-
-        out = firewall.run_powershell(
-            "Get-NetFirewallRule -DisplayName 'Overwatch Application' -ErrorAction SilentlyContinue | "
-            "Get-NetFirewallApplicationFilter | Select-Object -First 1 -ExpandProperty Program"
-        )
-        if out and os.path.isfile(out.strip()):
-            return self.resolve_executable_path(out.strip())
+        # Check Windows Uninstall Registry cleanly without PowerShell
+        if os.name == "nt":
+            try:
+                import winreg
+                reg_paths = [
+                    r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Overwatch",
+                    r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Overwatch",
+                    r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 2357570",
+                ]
+                for rpath in reg_paths:
+                    try:
+                        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, rpath) as key:
+                            install_loc, _ = winreg.QueryValueEx(key, "InstallLocation")
+                            if install_loc:
+                                resolved = self.resolve_executable_path(install_loc)
+                                if resolved:
+                                    return resolved
+                    except OSError:
+                        pass
+            except Exception:
+                pass
 
         return ""
 
     def disable_lock(self) -> bool:
-        """Clean any NexusLock and legacy NetherWatch/dropship rules for Overwatch."""
-        firewall.remove_block_rules(display_name=self.rule_name, group_name=self.group_name)
-        legacy_script = """
-Get-NetFirewallRule | Where-Object {
-    $_.DisplayName -like '*NexusLock*Overwatch*' -or
-    $_.Group -eq 'NexusLock_OW2' -or
-    $_.DisplayName -like '*NetherWatch*Overwatch*' -or
-    $_.DisplayName -eq 'NetherWatch - Netherlands Only' -or
-    $_.Group -eq 'NetherWatch_Rules' -or
-    $_.Group -eq 'Dropship_Netherlands' -or
-    $_.Group -eq 'stormy/dropship/v3'
-} | Remove-NetFirewallRule -ErrorAction SilentlyContinue
-Write-Output "DONE"
-"""
-        firewall.run_powershell(legacy_script)
+        """Clean any NexusLock and legacy NetherWatch rules for Overwatch."""
+        for name in [
+            self.rule_name,
+            "NetherWatch - Overwatch 2 (Netherlands Only)",
+            "NetherWatch - Netherlands Only",
+        ]:
+            firewall.remove_block_rules(display_name=name)
         return True
 
     def is_locked(self) -> bool:
-        script = f"""
-$r1 = Get-NetFirewallRule -DisplayName '{self.rule_name}' -ErrorAction SilentlyContinue
-$r2 = Get-NetFirewallRule -Group '{self.group_name}' -ErrorAction SilentlyContinue
-$r3 = Get-NetFirewallRule | Where-Object {{ $_.DisplayName -like '*NexusLock*Overwatch*' -or $_.DisplayName -like '*NetherWatch*Overwatch*' }}
-if ($r1 -or $r2 -or $r3) {{ Write-Output "YES" }} else {{ Write-Output "NO" }}
-"""
-        out = firewall.run_powershell(script)
-        return "YES" in out
+        return firewall.is_rule_active(display_name=self.rule_name)

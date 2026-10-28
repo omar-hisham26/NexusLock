@@ -1,59 +1,47 @@
 """
-firewall.py - Low-level Windows Firewall rule management via PowerShell
+firewall.py - Native Windows Firewall rule management via official netsh advfirewall CLI
+Uses standard netsh.exe instead of obfuscated PowerShell to avoid antivirus false-positives and improve speed.
 """
-import base64
 import os
-import re
 import subprocess
 import time
-from typing import List, Optional
+from typing import List, Optional, Tuple
+from src import i18n
+
+LEGACY_RULE_NAMES = [
+    "NexusLock - Overwatch 2 (Server Lock)",
+    "NexusLock - Deadlock (Server Lock)",
+    "NetherWatch - Overwatch 2 (Netherlands Only)",
+    "NetherWatch - Deadlock (Netherlands Only)",
+    "NetherWatch - Netherlands Only",
+]
 
 
 def time_now() -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S")
 
 
-def run_powershell(command_text: str) -> str:
+def run_netsh(args: List[str]) -> Tuple[int, str]:
     """
-    Run a PowerShell command using Base64 encoding to avoid any quoting or encoding issues.
-    Executes silently without opening a terminal window.
+    Execute netsh.exe advfirewall commands silently without opening a console window.
+    Returns (returncode, combined_output).
     """
     flags = 0x08000000 if os.name == "nt" else 0
+    cmd = ["netsh", "advfirewall", "firewall"] + args
     try:
-        encoded_bytes = command_text.encode("utf-16le")
-        encoded_str = base64.b64encode(encoded_bytes).decode("ascii")
-
         result = subprocess.run(
-            [
-                "powershell.exe",
-                "-NoProfile",
-                "-NonInteractive",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-EncodedCommand",
-                encoded_str,
-            ],
+            cmd,
             capture_output=True,
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=35,
+            timeout=15,
             creationflags=flags,
         )
-        out = (result.stdout or "").strip()
-        err = (result.stderr or "").strip()
-
-        if result.returncode != 0:
-            error_details = err if err else out
-            if "#< CLIXML" in error_details:
-                err_lines = re.findall(r'<S S="Error">(.*?)</S>', error_details, re.DOTALL)
-                if err_lines:
-                    error_details = "".join(err_lines).replace("_x000D__x000A_", "\n").replace("_x000A_", "\n").strip()
-            return f"ERROR: {error_details}"
-
-        return out if out else err
+        out = ((result.stdout or "") + "\n" + (result.stderr or "")).strip()
+        return result.returncode, out
     except Exception as error:
-        return f"ERROR: {error}"
+        return 1, str(error)
 
 
 def create_block_rule(
@@ -64,105 +52,64 @@ def create_block_rule(
 ) -> bool:
     """
     Create an Outbound Block rule in Windows Firewall for a specific executable and list of IPs.
+    Splits into chunks automatically if the IP list is very large.
     """
-    if not remote_ips:
-        raise ValueError("قائمة العناوين المراد حظرها فارغة!")
+    clean_ips = [ip.strip() for ip in remote_ips if ip.strip()]
+    if not clean_ips:
+        raise ValueError(i18n.t("err_empty_ips"))
 
-    # Format ips array for PowerShell
-    formatted_ips = ",".join(f"'{ip.strip()}'" for ip in remote_ips if ip.strip())
-    safe_path = os.path.normpath(program_path).replace("'", "''")
-    safe_name = display_name.replace("'", "''")
-    safe_group = group_name.replace("'", "''")
+    norm_path = os.path.normpath(program_path)
 
-    script = f"""
-$ErrorActionPreference = 'Stop'
+    # First remove any existing rules with this name
+    remove_block_rules(display_name=display_name, group_name=group_name)
 
-try {{
-    Get-NetFirewallRule -DisplayName '{safe_name}' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
-}} catch {{ }}
+    # Split into chunks of 200 IPs max per rule so command line length is always small
+    chunk_size = 200
+    for idx in range(0, len(clean_ips), chunk_size):
+        chunk = clean_ips[idx : idx + chunk_size]
+        ips_arg = ",".join(chunk)
+        code, output = run_netsh(
+            [
+                "add",
+                "rule",
+                f"name={display_name}",
+                "dir=out",
+                "action=block",
+                f"program={norm_path}",
+                f"remoteip={ips_arg}",
+                "profile=any",
+                "enable=yes",
+            ]
+        )
+        if code != 0:
+            low_out = output.lower()
+            if "elevation" in low_out or "admin" in low_out or "access is denied" in low_out:
+                raise PermissionError(i18n.t("err_admin_required"))
+            raise RuntimeError(i18n.t("err_firewall_failed", msg=output))
 
-try {{
-    Get-NetFirewallRule -Group '{safe_group}' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
-}} catch {{ }}
-
-$ips = @({formatted_ips})
-New-NetFirewallRule `
-    -DisplayName '{safe_name}' `
-    -Group '{safe_group}' `
-    -Direction Outbound `
-    -Action Block `
-    -Program '{safe_path}' `
-    -RemoteAddress $ips `
-    -Profile Any `
-    -Enabled True | Out-Null
-Write-Output "DONE"
-"""
-    output = run_powershell(script)
-    if "DONE" not in output:
-        if "CIM resource was not available" in output or "Access is denied" in output or "UnauthorizedAccess" in output:
-            raise PermissionError(
-                "ويندوز يرفض تعديل جدار الحماية بدون صلاحيات المسؤول!\n"
-                "يرجى تشغيل البرنامج كمسؤول (Run as administrator)."
-            )
-        clean_msg = output.replace("ERROR: ", "").strip()
-        raise RuntimeError(f"فشل إنشاء قاعدة جدار الحماية:\n{clean_msg}")
     return True
 
 
 def remove_block_rules(display_name: Optional[str] = None, group_name: Optional[str] = None) -> bool:
-    """Remove specific firewall rules by DisplayName or Group."""
-    cmd_parts = []
+    """Remove specific firewall rules by rule name."""
     if display_name:
-        safe_name = display_name.replace("'", "''")
-        cmd_parts.append(f"try {{ Get-NetFirewallRule -DisplayName '{safe_name}' -ErrorAction SilentlyContinue | Remove-NetFirewallRule }} catch {{ }}")
-    if group_name:
-        safe_group = group_name.replace("'", "''")
-        cmd_parts.append(f"try {{ Get-NetFirewallRule -Group '{safe_group}' -ErrorAction SilentlyContinue | Remove-NetFirewallRule }} catch {{ }}")
-
-    cmd_parts.append('Write-Output "DONE"')
-    script = "\n".join(cmd_parts)
-    output = run_powershell(script)
-    return "DONE" in output
+        run_netsh(["delete", "rule", f"name={display_name}"])
+    return True
 
 
 def is_rule_active(display_name: Optional[str] = None, group_name: Optional[str] = None) -> bool:
-    """Check if the firewall rule exists and is active."""
-    checks = []
-    if display_name:
-        safe_name = display_name.replace("'", "''")
-        checks.append(f"$r1 = Get-NetFirewallRule -DisplayName '{safe_name}' -ErrorAction SilentlyContinue")
-    else:
-        checks.append("$r1 = $null")
-
-    if group_name:
-        safe_group = group_name.replace("'", "''")
-        checks.append(f"$r2 = Get-NetFirewallRule -Group '{safe_group}' -ErrorAction SilentlyContinue")
-    else:
-        checks.append("$r2 = $null")
-
-    script = f"""
-{'\n'.join(checks)}
-if ($r1 -or $r2) {{ Write-Output "YES_ACTIVE" }} else {{ Write-Output "NO_INACTIVE" }}
-"""
-    output = run_powershell(script)
-    return "YES_ACTIVE" in output
+    """Check if the firewall rule exists and is active using netsh."""
+    if not display_name:
+        return False
+    code, _ = run_netsh(["show", "rule", f"name={display_name}"])
+    return code == 0
 
 
 def clean_all_nexuslock_rules() -> bool:
-    """Factory cleanup: remove all NexusLock and legacy NetherWatch/dropship rules across all games."""
-    script = """
-Get-NetFirewallRule | Where-Object {
-    $_.DisplayName -like '*NexusLock*' -or
-    $_.Group -like '*NexusLock*' -or
-    $_.DisplayName -like '*NetherWatch*' -or
-    $_.Group -like '*NetherWatch*' -or
-    $_.DisplayName -like '*dropship*' -or
-    $_.Group -like '*Dropship*'
-} | Remove-NetFirewallRule -ErrorAction SilentlyContinue
-Write-Output "CLEANED"
-"""
-    output = run_powershell(script)
-    return "CLEANED" in output
+    """Factory cleanup: remove all NexusLock and legacy NetherWatch rules across all games."""
+    for r_name in LEGACY_RULE_NAMES:
+        run_netsh(["delete", "rule", f"name={r_name}"])
+    return True
 
 
 clean_all_netherwatch_rules = clean_all_nexuslock_rules

@@ -10,7 +10,7 @@ from pathlib import Path
 # Application branding
 APP_NAME = "NexusLock"
 APP_TITLE = "NexusLock — تبليك سيرفرات الألعاب"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 GITHUB_REPO = "omar-hisham26/NexusLock"
 
 # Runtime directories
@@ -46,6 +46,7 @@ SETTINGS_FILE = get_settings_file_path()
 
 # Default initial configuration
 DEFAULT_CONFIG = {
+    "language": "ar",  # "ar" or "en"
     "selected_view": "overwatch",  # "catalog" or game_id
     "unblock_on_close": False,
     "games": {
@@ -86,6 +87,8 @@ def load_settings() -> dict:
                         if "unblock_on_close" in saved:
                             cfg["unblock_on_close"] = bool(saved["unblock_on_close"])
                     else:
+                        if "language" in saved and saved["language"] in ("ar", "en"):
+                            cfg["language"] = saved["language"]
                         if "selected_view" in saved:
                             cfg["selected_view"] = saved["selected_view"]
                         elif "selected_game" in saved:
