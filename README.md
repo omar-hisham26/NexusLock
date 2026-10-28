@@ -11,9 +11,8 @@
 
 <br>
 
-<!-- زر التحميل الواضح والبسيط -->
 <a href="https://github.com/omar-hisham26/NexusLock/releases/latest/download/NexusLock-Setup.exe">
-  <img src="https://img.shields.io/badge/⬇️_اضغط_هنا_لتحميل_البرنامج_مباشرة_(NexusLock--Setup.exe)-10b981?style=for-the-badge&logo=windows&logoColor=white" height="52" alt="تحميل البرنامج">
+  <img src="https://img.shields.io/badge/⬇️_Click_Here_to_Download_Directly_(NexusLock--Setup.exe)-10b981?style=for-the-badge&logo=windows&logoColor=white" height="52" alt="Download NexusLock">
 </a>
 
 <br><br>
